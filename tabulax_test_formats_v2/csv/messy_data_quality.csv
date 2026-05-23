@@ -1,0 +1,8 @@
+﻿order_id,product,unit_price,quantity,order_date,email,notes
+O-1001,Notebook,45.50,3,2026-01-12,a@example.com,Normal order
+O-1002,"Coffee, dark roast",320.00,1,2026-01-13,b@example.com,"Gift wrap, please"
+O-1003,USB-C cable,199.99,2,2026/01/14,,Missing email
+O-1004,Desk lamp,,1,14-01-2026,d@example.com,Missing price
+O-1005,Water bottle,0,0,invalid-date,not-an-email,Invalid date/email
+O-1006,Notebook,45.50,3,2026-01-12,a@example.com,Duplicate-like row
+O-1007,Tea,175.25,,2026-02-01,e@example.com,Missing quantity

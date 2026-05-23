@@ -1,0 +1,6 @@
+﻿sku,item,unit_cost,stock_count,supplier_code,active
+SKU-001,Keyboard,750.0,12,SUP-A,True
+SKU-002,Mouse,350.0,25,SUP-B,True
+SKU-003,Monitor,8999.0,4,SUP-A,True
+SKU-004,Webcam,2199.0,0,SUP-C,False
+SKU-005,Headphones,1599.0,7,SUP-B,True

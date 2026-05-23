@@ -1,0 +1,39 @@
+# ---- Web framework ----
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.19
+
+# ---- Config / validation (Pydantic v2) ----
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# ---- Auth ----
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+
+# ---- Databases ----
+motor==3.7.0
+pymongo==4.10.1
+mysql-connector-python==9.1.0
+
+# ---- Data / numerics ----
+pandas==2.1.4
+numpy==1.26.4
+scipy==1.14.1
+openpyxl==3.1.5
+
+# ---- Optional LLM (app starts and works without a key) ----
+langchain-openai==0.3.0
+openai==1.59.6
+
+# ---- Calendar conversions used by an algorithmic template ----
+hijri-converter==2.3.2.post1
+
+# ---- Env ----
+python-dotenv==1.0.1
+
+# ---- Testing ----
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1

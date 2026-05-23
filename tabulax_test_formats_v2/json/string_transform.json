@@ -1,0 +1,37 @@
+[
+  {
+    "employee_id": "E-101",
+    "first_name": "ananya",
+    "last_name": "rao",
+    "department": "Engineering",
+    "email": "ananya.rao@example.com"
+  },
+  {
+    "employee_id": "E-102",
+    "first_name": "kiran",
+    "last_name": "kumar",
+    "department": "Sales",
+    "email": "kiran.kumar@example.com"
+  },
+  {
+    "employee_id": "E-103",
+    "first_name": "meera",
+    "last_name": "shah",
+    "department": "Finance",
+    "email": "meera.shah@example.com"
+  },
+  {
+    "employee_id": "E-104",
+    "first_name": "arjun",
+    "last_name": "reddy",
+    "department": "Engineering",
+    "email": "arjun.reddy@example.com"
+  },
+  {
+    "employee_id": "E-105",
+    "first_name": "divya",
+    "last_name": "patel",
+    "department": "Operations",
+    "email": "divya.patel@example.com"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "record_id": "N-001",
+    "customer": "Asha",
+    "score": 7,
+    "signup_date": "2025-01-12"
+  },
+  {
+    "record_id": "N-002",
+    "customer": "Bharat",
+    "score": 8,
+    "signup_date": "2025-01-15"
+  },
+  {
+    "record_id": "N-003",
+    "customer": "Charan",
+    "score": 6,
+    "signup_date": "2025-02-01"
+  },
+  {
+    "record_id": "N-004",
+    "customer": "Divya",
+    "score": 5,
+    "signup_date": "2025-02-04"
+  },
+  {
+    "record_id": "N-005",
+    "customer": "Esha",
+    "score": 7,
+    "signup_date": "2025-02-10"
+  }
+]

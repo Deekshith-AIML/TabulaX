@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tabula/backend
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        # conftest.py forces DATABASE_NAME=tabula_test and disables the LLM,
+        # so this is hermetic and needs no secrets. MySQL integration tests
+        # self-skip when no server is reachable.
+        run: python -m pytest tests/ -q
+
+  frontend:
+    name: Frontend type-check + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tabula/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tabula/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (tsc)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build (vite)
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:8000
+
+      # The codebase carries pre-existing lint debt (unused imports/vars and
+      # `any` from the original app). Report it without failing the build so
+      # regressions are still visible.
+      - name: Lint (non-blocking, pre-existing debt)
+        run: npm run lint
+        continue-on-error: true

@@ -1,0 +1,19 @@
+# Keep the image lean and never bake secrets into it.
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+.env
+.env.*
+!.env.example
+*.md
+.git
+.gitignore

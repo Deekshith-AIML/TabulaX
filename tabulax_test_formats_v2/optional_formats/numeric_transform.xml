@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<records>
+  <record><record_id>N-001</record_id><customer>Asha</customer><score>7</score><signup_date>2025-01-12</signup_date></record>
+  <record><record_id>N-002</record_id><customer>Bharat</customer><score>8</score><signup_date>2025-01-15</signup_date></record>
+  <record><record_id>N-003</record_id><customer>Charan</customer><score>6</score><signup_date>2025-02-01</signup_date></record>
+  <record><record_id>N-004</record_id><customer>Divya</customer><score>5</score><signup_date>2025-02-04</signup_date></record>
+</records>

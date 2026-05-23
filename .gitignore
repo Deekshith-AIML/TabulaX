@@ -1,0 +1,49 @@
+# --- Secrets & local env ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Node ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# --- Local datasets & uploads ---
+uploads/
+*.csv
+!backend/tests/fixtures/*.csv
+data/
+tmp/
+temp/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*

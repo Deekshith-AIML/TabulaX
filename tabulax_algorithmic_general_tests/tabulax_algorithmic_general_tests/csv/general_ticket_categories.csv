@@ -1,0 +1,9 @@
+ticket_id,ticket_description
+GEN-001,Cannot sign in even with the correct password
+GEN-002,Password reset link has expired
+GEN-003,Subscription charged twice this month
+GEN-004,I was billed after I cancelled my plan
+GEN-005,Laptop shuts down whenever I open it
+GEN-006,Screen flickers after I connect the monitor
+GEN-007,Office Wi-Fi disconnects during calls
+GEN-008,VPN connection keeps dropping

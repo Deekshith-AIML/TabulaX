@@ -1,0 +1,65 @@
+[
+  {
+    "order_id": "O-1001",
+    "product": "Notebook",
+    "unit_price": "45.50",
+    "quantity": "3",
+    "order_date": "2026-01-12",
+    "email": "a@example.com",
+    "notes": "Normal order"
+  },
+  {
+    "order_id": "O-1002",
+    "product": "Coffee, dark roast",
+    "unit_price": "320.00",
+    "quantity": "1",
+    "order_date": "2026-01-13",
+    "email": "b@example.com",
+    "notes": "Gift wrap, please"
+  },
+  {
+    "order_id": "O-1003",
+    "product": "USB-C cable",
+    "unit_price": "199.99",
+    "quantity": "2",
+    "order_date": "2026/01/14",
+    "email": "",
+    "notes": "Missing email"
+  },
+  {
+    "order_id": "O-1004",
+    "product": "Desk lamp",
+    "unit_price": "",
+    "quantity": "1",
+    "order_date": "14-01-2026",
+    "email": "d@example.com",
+    "notes": "Missing price"
+  },
+  {
+    "order_id": "O-1005",
+    "product": "Water bottle",
+    "unit_price": "0",
+    "quantity": "0",
+    "order_date": "invalid-date",
+    "email": "not-an-email",
+    "notes": "Invalid date/email"
+  },
+  {
+    "order_id": "O-1006",
+    "product": "Notebook",
+    "unit_price": "45.50",
+    "quantity": "3",
+    "order_date": "2026-01-12",
+    "email": "a@example.com",
+    "notes": "Duplicate-like row"
+  },
+  {
+    "order_id": "O-1007",
+    "product": "Tea",
+    "unit_price": "175.25",
+    "quantity": "",
+    "order_date": "2026-02-01",
+    "email": "e@example.com",
+    "notes": "Missing quantity"
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "_id": "DOC-001",
+    "customer": {
+      "name": "Asha Rao",
+      "city": "Hyderabad"
+    },
+    "tags": [
+      "priority",
+      "online"
+    ],
+    "amount": 1250.5,
+    "paid": true,
+    "comment": null
+  },
+  {
+    "_id": "DOC-002",
+    "customer": {
+      "name": "Bharat Kumar",
+      "city": "Warangal"
+    },
+    "tags": [
+      "store"
+    ],
+    "amount": 0,
+    "paid": false,
+    "comment": "No comment"
+  },
+  {
+    "_id": "DOC-003",
+    "customer": {
+      "name": "Meera Shah",
+      "city": "Secunderabad"
+    },
+    "tags": [],
+    "amount": null,
+    "paid": false,
+    "comment": null
+  }
+]

@@ -1,0 +1,111 @@
+# Local end-to-end environment for TabulaX.
+#
+#   docker compose up --build
+#
+# Frontend: http://localhost:8081
+# Backend:  http://localhost:8000  (docs at /docs, health at /health)
+# Mongo:    mongodb://localhost:27017
+#
+# Optional local LLM (free, no API key, no paid service):
+#   docker compose --profile local-ai up --build
+# which starts Ollama and an one-shot init container that downloads the model
+# (llama3.2, ~2 GB) into the persistent ollama_data volume. Set LLM_PROVIDER=ollama
+# so deterministic-first transforms fall back to the local model. You can also
+# trigger the download later from the UI (AI settings → "Download model").
+# Hardware guidance (approx): 8 GB RAM for llama3.2 (3B); disk ~2-4 GB per model.
+#
+# The browser calls the backend directly (VITE_API_URL is baked at build
+# time), so CORS_ORIGINS must include the frontend origin.
+# SECRET_KEY is a dev default — set a real one for anything shared.
+
+services:
+  backend:
+    build:
+      context: ./tabula/backend
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      MONGODB_URL: mongodb://mongo:27017
+      DATABASE_NAME: tabula
+      SECRET_KEY: ${SECRET_KEY:-dev-only-not-a-real-secret-change-me}
+      CORS_ORIGINS: http://localhost:8081,http://127.0.0.1:8081
+      # Loopback hosts entered in the UI ("localhost") are mapped to
+      # host.docker.internal so they reach services on your machine.
+      IN_DOCKER: "1"
+      # Leave OPENAI_API_KEY unset for the free / no-LLM configuration.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # LLM provider: "openai" (default), "ollama" (local, free), or "none".
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      # Used when LLM_PROVIDER=ollama. Compose service DNS resolves only when
+      # a profile that starts "ollama" is active; otherwise the backend reports
+      # the server unreachable and deterministic transforms keep working.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      # Allow the UI-triggered model download endpoint without extra confirm
+      # (the UI still asks first).
+      OLLAMA_AUTO_DOWNLOAD: ${OLLAMA_AUTO_DOWNLOAD:-false}
+    depends_on:
+      mongo:
+        condition: service_started
+    restart: unless-stopped
+
+  # Optional local LLM. Enabled via:  docker compose --profile local-ai up
+  # (the legacy "--profile ollama" alias also works).
+  # No host ports are published; the backend reaches it on the compose
+  # network at http://ollama:11434. To expose it for debugging, add:
+  #   ports: ["11434:11434"]
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-ai", "ollama"]
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # One-shot model download. Runs only with the local-ai profile and waits
+  # for the Ollama server, then pulls OLLAMA_MODEL into the shared volume.
+  # Models are large; the first run can take several minutes.
+  ollama-init:
+    image: ollama/ollama:latest
+    profiles: ["local-ai"]
+    depends_on:
+      - ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for the Ollama server..."
+        until ollama list >/dev/null 2>&1; do sleep 2; done
+        echo "Downloading model $${OLLAMA_MODEL} (this can take a while)..."
+        ollama pull "$${OLLAMA_MODEL}"
+        echo "Model ready."
+
+  frontend:
+    build:
+      context: ./tabula/frontend
+      args:
+        # Inlined into the JS bundle; the browser reaches the backend on the
+        # host-mapped port, not via Docker's internal DNS.
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  ollama_data:

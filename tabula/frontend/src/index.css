@@ -1,0 +1,427 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+:root {
+  --primary: #3b82f6;
+  --primary-light: #60a5fa;
+  --primary-dark: #2563eb;
+  --secondary: #0ea5e9;
+  --accent: #8b5cf6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --neutral-50: #f9fafb;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-300: #d1d5db;
+  --neutral-400: #9ca3af;
+  --neutral-500: #6b7280;
+  --neutral-600: #4b5563;
+  --neutral-700: #374151;
+  --neutral-800: #1f2937;
+  --neutral-900: #111827;
+
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.125rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-soft:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-raised:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 12px 28px rgba(15, 23, 42, 0.1);
+  --shadow-float:
+    0 4px 8px rgba(15, 23, 42, 0.05),
+    0 24px 48px rgba(15, 23, 42, 0.14);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  @apply bg-gradient-to-br from-slate-50 via-white to-blue-100;
+  @apply text-slate-800;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s var(--ease-out) both;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s var(--ease-out) both;
+}
+
+/* Entrance staggering for sections that mount together */
+.stagger-1 { animation-delay: 75ms; }
+.stagger-2 { animation-delay: 150ms; }
+
+/* --- Ambient background: slow drifting blurred orbs ---------------------- */
+.bg-orbs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.3;
+  will-change: transform;
+}
+
+@keyframes orbDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(35px, -45px) scale(1.06); }
+  66%      { transform: translate(-25px, 30px) scale(0.94); }
+}
+
+.bg-orb-1 {
+  width: 460px;
+  height: 460px;
+  background: radial-gradient(circle, #60a5fa, transparent 70%);
+  top: -140px;
+  left: -120px;
+  animation: orbDrift 26s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, #a78bfa, transparent 70%);
+  top: 30%;
+  right: -160px;
+  animation: orbDrift 34s ease-in-out infinite reverse;
+}
+
+.bg-orb-3 {
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, #38bdf8, transparent 70%);
+  bottom: -120px;
+  left: 38%;
+  animation: orbDrift 40s ease-in-out infinite;
+}
+
+/* --- Wordmark shimmer ---------------------------------------------------- */
+@keyframes shimmerSweep {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmerSweep 6s linear infinite;
+}
+
+/* --- Floating upload icon ------------------------------------------------ */
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: gentleFloat 3s ease-in-out infinite;
+}
+
+/* --- Button sheen: light sweep on hover ---------------------------------- */
+.btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s var(--ease-out);
+  pointer-events: none;
+}
+
+.btn:hover::before {
+  left: 130%;
+}
+
+.btn:disabled::before,
+.btn:disabled:hover::before {
+  display: none;
+}
+
+.card {
+  @apply bg-white shadow-md hover:shadow-lg transition-all duration-300;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-raised);
+}
+
+.glass-card {
+  @apply bg-white/75 backdrop-blur-xl;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: var(--shadow-raised);
+}
+
+.btn {
+  @apply px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2;
+  border-radius: var(--radius-md);
+  transition: all 0.2s var(--ease-out);
+  transform: translateZ(0);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px rgba(15, 23, 42, 0.25);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  @apply text-white focus:ring-primary;
+  background-image: linear-gradient(180deg, #4f8ff7, #2563eb);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px rgba(37, 99, 235, 0.55);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-image: linear-gradient(180deg, #5a97f8, #1d4ed8);
+}
+
+.btn-secondary {
+  @apply text-white focus:ring-secondary;
+  background-image: linear-gradient(180deg, #22b5ee, #0284c7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px rgba(2, 132, 199, 0.5);
+}
+
+.btn-accent {
+  @apply text-white focus:ring-accent;
+  background-image: linear-gradient(180deg, #9775fa, #7c3aed);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px rgba(124, 58, 237, 0.5);
+}
+
+.btn-success {
+  @apply text-white focus:ring-success;
+  background-image: linear-gradient(180deg, #25c693, #059669);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px rgba(5, 150, 105, 0.5);
+}
+
+.btn-error {
+  @apply text-white focus:ring-error;
+  background-image: linear-gradient(180deg, #f46565, #dc2626);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px rgba(220, 38, 38, 0.5);
+}
+
+/* Form elements */
+.input,
+.select,
+.textarea {
+  @apply w-full px-4 py-2.5 bg-white text-slate-800 placeholder-slate-400 transition-all duration-200;
+  border-radius: var(--radius-md);
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: #cbd5e1;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 4px rgba(59, 130, 246, 0.14),
+    inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.textarea {
+  resize: none;
+}
+
+.select {
+  @apply bg-white;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.5rem;
+}
+
+/* Section styles */
+.section {
+  @apply mb-8 animate-slide-in;
+}
+
+.section-title {
+  @apply text-xl font-semibold text-slate-800 mb-4 tracking-tight;
+}
+
+/* Code display */
+.code-block {
+  @apply text-slate-100 p-4 overflow-x-auto font-mono text-sm;
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, #0f172a, #1e293b);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Table styles */
+.data-table {
+  @apply w-full border-collapse;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.data-table th {
+  @apply p-3 text-left text-slate-600 font-semibold;
+  background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.data-table td {
+  @apply p-3 text-slate-600;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover td {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+/* Add new styles for transformed columns */
+.column-transformed {
+  @apply bg-emerald-50 text-emerald-800;
+}
+
+.cell-transformed {
+  @apply bg-emerald-50/70 text-emerald-900;
+}
+
+/* Revert menu styles */
+.revert-menu-container {
+  @apply relative inline-block;
+}
+
+.revert-menu {
+  @apply absolute bg-white py-2 mt-2 right-0 z-[9999];
+  min-width: 200px;
+  border-radius: var(--radius-md);
+  border: 1px solid #e2e8f0;
+  box-shadow: var(--shadow-float);
+}
+
+.revert-menu-item {
+  @apply w-full text-left px-4 py-2 hover:bg-slate-100 text-sm transition-colors duration-150;
+}
+
+.revert-menu-item:first-child {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.revert-menu-item:last-child {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.revert-menu-divider {
+  @apply border-t border-slate-200 mt-2 pt-2;
+}
+
+/* Button states */
+.btn:disabled {
+  @apply opacity-50 cursor-not-allowed;
+  transform: none !important;
+  box-shadow: none;
+}
+
+/* --- Subtle custom scrollbars ------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
+/* --- Respect users who prefer less motion ------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .bg-orb,
+  .animate-shimmer,
+  .animate-float {
+    animation: none !important;
+  }
+
+  .animate-fade-in,
+  .animate-slide-in {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+
+  .btn::before {
+    display: none;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

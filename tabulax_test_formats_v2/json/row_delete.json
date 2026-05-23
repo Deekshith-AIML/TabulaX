@@ -1,0 +1,44 @@
+[
+  {
+    "record_id": "R-001",
+    "name": "Asha",
+    "department": "Sales",
+    "status": "Active",
+    "amount": 1200.0
+  },
+  {
+    "record_id": "R-002",
+    "name": "Bharat",
+    "department": "Engineering",
+    "status": "Active",
+    "amount": 1800.0
+  },
+  {
+    "record_id": "R-003",
+    "name": "Charan",
+    "department": "Sales",
+    "status": "Inactive",
+    "amount": 1200.0
+  },
+  {
+    "record_id": "R-004",
+    "name": "Divya",
+    "department": "Finance",
+    "status": "Active",
+    "amount": 2500.0
+  },
+  {
+    "record_id": "R-005",
+    "name": "Asha",
+    "department": "Sales",
+    "status": "Active",
+    "amount": 1200.0
+  },
+  {
+    "record_id": "R-006",
+    "name": "Farhan",
+    "department": "Engineering",
+    "status": "Inactive",
+    "amount": 1800.0
+  }
+]

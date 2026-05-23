@@ -1,0 +1,42 @@
+[
+  {
+    "sku": "SKU-001",
+    "item": "Keyboard",
+    "unit_cost": 750.0,
+    "stock_count": 12,
+    "supplier_code": "SUP-A",
+    "active": true
+  },
+  {
+    "sku": "SKU-002",
+    "item": "Mouse",
+    "unit_cost": 350.0,
+    "stock_count": 25,
+    "supplier_code": "SUP-B",
+    "active": true
+  },
+  {
+    "sku": "SKU-003",
+    "item": "Monitor",
+    "unit_cost": 8999.0,
+    "stock_count": 4,
+    "supplier_code": "SUP-A",
+    "active": true
+  },
+  {
+    "sku": "SKU-004",
+    "item": "Webcam",
+    "unit_cost": 2199.0,
+    "stock_count": 0,
+    "supplier_code": "SUP-C",
+    "active": false
+  },
+  {
+    "sku": "SKU-005",
+    "item": "Headphones",
+    "unit_cost": 1599.0,
+    "stock_count": 7,
+    "supplier_code": "SUP-B",
+    "active": true
+  }
+]

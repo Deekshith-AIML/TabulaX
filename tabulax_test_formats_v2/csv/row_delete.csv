@@ -1,0 +1,7 @@
+﻿record_id,name,department,status,amount
+R-001,Asha,Sales,Active,1200
+R-002,Bharat,Engineering,Active,1800
+R-003,Charan,Sales,Inactive,1200
+R-004,Divya,Finance,Active,2500
+R-005,Asha,Sales,Active,1200
+R-006,Farhan,Engineering,Inactive,1800

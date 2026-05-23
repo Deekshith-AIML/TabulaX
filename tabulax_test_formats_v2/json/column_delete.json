@@ -1,0 +1,42 @@
+[
+  {
+    "employee_id": "C-201",
+    "first_name": "Aarav",
+    "last_name": "Singh",
+    "email": "aarav@example.com",
+    "department": "Engineering",
+    "salary": 85000,
+    "join_date": "2022-04-11",
+    "notes": "Contract renewed"
+  },
+  {
+    "employee_id": "C-202",
+    "first_name": "Diya",
+    "last_name": "Patel",
+    "email": "diya@example.com",
+    "department": "Sales",
+    "salary": 72000,
+    "join_date": "2023-07-01",
+    "notes": "Remote"
+  },
+  {
+    "employee_id": "C-203",
+    "first_name": "Ishaan",
+    "last_name": "Reddy",
+    "email": "ishaan@example.com",
+    "department": "Finance",
+    "salary": 79000,
+    "join_date": "2021-11-20",
+    "notes": "Moved teams"
+  },
+  {
+    "employee_id": "C-204",
+    "first_name": "Sara",
+    "last_name": "Khan",
+    "email": "sara@example.com",
+    "department": "Operations",
+    "salary": 68000,
+    "join_date": "2024-02-15",
+    "notes": "Part time"
+  }
+]

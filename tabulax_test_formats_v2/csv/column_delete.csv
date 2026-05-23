@@ -1,0 +1,5 @@
+﻿employee_id,first_name,last_name,email,department,salary,join_date,notes
+C-201,Aarav,Singh,aarav@example.com,Engineering,85000,2022-04-11,Contract renewed
+C-202,Diya,Patel,diya@example.com,Sales,72000,2023-07-01,Remote
+C-203,Ishaan,Reddy,ishaan@example.com,Finance,79000,2021-11-20,Moved teams
+C-204,Sara,Khan,sara@example.com,Operations,68000,2024-02-15,Part time
