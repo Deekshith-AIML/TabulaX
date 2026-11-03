@@ -366,12 +366,24 @@ def _parse_classify_json(
 
     cls = str(data.get("class") or data.get("classification") or "").strip()
     family = next((c for c in VALID_CLASSES if c.lower() == cls.lower()), None)
-    if family is None:
-        return None
 
     task = str(data.get("task") or "").strip().lower()
     if task not in VALID_TASKS:
         task = None
+
+    if family is None:
+        # Models (notably mistral) often put the TASK name -- e.g. "semantic"
+        # -- or a synonym ("classification") in the "class" field.  The family
+        # is display-only; the meaningful part is the task/labels pair, which
+        # must not be discarded because of a wrong family label.
+        cls_lower = cls.lower()
+        if cls_lower in VALID_TASKS:
+            if task is None:
+                task = cls_lower
+        elif task is None:
+            # Neither a family nor a task: the answer is genuinely unusable.
+            return None
+        family = "General"
 
     raw_labels = data.get("labels")
     labels: List[str] = []
@@ -398,13 +410,17 @@ def _llm_infer(
     serialized = ", ".join(
         f'({_json.dumps(s)} -> {_json.dumps(t)})' for s, t in pairs[:12]
     )
+    from transform.spec import VALID_TASKS
+
     prompt = (
         _CLASSIFY_PROMPT_HEADER
         + _TASK_INSTRUCTION
         + "\nSource -> Target pairs:\n"
         + serialized
-        + '\n\nRespond with ONLY JSON: {"class": "...", "task": "...", '
-        '"labels": [], "reason": "..."}\n'
+        + "\n\nRespond with ONLY JSON -- one JSON object and no other text:\n"
+        '{"class": "...", "task": "...", "labels": [], "reason": "..."}\n'
+        f'"class" MUST be exactly one of: {", ".join(VALID_CLASSES)}.\n'
+        f'"task" MUST be exactly one of: {", ".join(VALID_TASKS)}.\n'
         '"labels" must list the complete closed set of allowed output labels '
         'when task is "semantic" and the outputs are category labels; '
         "otherwise use [].\n"
@@ -419,15 +435,56 @@ def _llm_infer(
         return None, None, [], reason
 
     parsed = _parse_classify_json(text)
-    if parsed:
+    if parsed is not None and parsed[1] is not None:
+        family, task, labels = parsed
+        return family, task, labels, ""
+
+    # The model answered but in a form we cannot use (unrecognized "class"
+    # and/or a missing "task").  One corrective retry shows it exactly what
+    # was wrong and the only acceptable values; skipped when the per-request
+    # budget has no call left.
+    retried_text: Optional[str] = None
+    budget_left = budget is None or int(
+        budget.get("remaining", llm.settings.llm_max_calls_per_request)
+    ) > 0
+    if budget_left:
+        corrective = (
+            prompt
+            + "\nYour previous response could not be used:\n"
+            + text.strip()[:600]
+            + '\nRespond with ONLY JSON again: "class" MUST be exactly one '
+            f'of: {", ".join(VALID_CLASSES)}; "task" MUST be exactly one '
+            f'of: {", ".join(VALID_TASKS)}.'
+        )
+        try:
+            retried_text = llm.invoke(
+                corrective, max_tokens=300, override=override, budget=budget
+            )
+        except Exception as exc:
+            logger.warning(
+                "LLM corrective classification retry failed: %s",
+                str(exc).strip()[:300],
+            )
+        else:
+            second = _parse_classify_json(retried_text)
+            if second is not None and second[1] is not None:
+                family, task, labels = second
+                return family, task, labels, ""
+
+    if parsed is not None:
+        # Family usable but task missing: keep the family -- the planner
+        # reports the missing task rather than losing the whole answer.
         family, task, labels = parsed
         return family, task, labels, ""
 
     # Legacy fallback: a plain class name in free text (never trusted for task).
-    lowered = text.strip().lower()
-    for cls in VALID_CLASSES:
-        if cls.lower() in lowered:
-            return cls, None, [], ""
+    for candidate in (retried_text, text):
+        if not candidate:
+            continue
+        lowered = candidate.strip().lower()
+        for cls in VALID_CLASSES:
+            if cls.lower() in lowered:
+                return cls, None, [], ""
     return None, None, [], "the LLM did not return a recognized class name"
 
 

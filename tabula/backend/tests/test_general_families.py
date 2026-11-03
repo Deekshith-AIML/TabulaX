@@ -74,7 +74,9 @@ def rowid_responder(fn: Callable[[str], object], confidences=None):
     """Build a mock ``llm.invoke`` answering with the row-id contract."""
 
     def _invoke(prompt, max_tokens=400, override=None, budget=None):
-        if "Respond with ONLY JSON" in prompt:
+        # The CLASSIFY prompt is the only one that carries source->target
+        # pairs; apply prompts may legitimately ask for JSON too.
+        if "Source -> Target pairs" in prompt:
             raise AssertionError("classify should not be hit in this test")
         ids = _extract_row_ids(prompt)
         inputs = _extract_inputs(prompt)

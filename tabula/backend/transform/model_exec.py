@@ -19,8 +19,16 @@ sandbox path gives for code:
 * per-row STATUS (ok / review / failed / blank / null) and the model's
   advisory confidence are tracked so partial success and low-confidence rows
   are visible -- nothing is silently converted to null or dropped;
+* classification into a closed label set uses a focused forced-choice prompt
+  (one label per input, copied verbatim from the allowed list) instead of the
+  generic results-array prompt: measured live on the user's 8-ticket dataset a
+  7B model scored 5/8 on the generic prompt vs 8/8 here, so this is both more
+  accurate and cheaper (no repair round trip);
 * a malformed response is retried once with a corrective instruction, then
   the whole batch is reported as failed -- never guessed;
+* outputs outside a closed label set trigger one focused, forced-choice retry
+  covering just the offending (or missing) rows; rows still wrong after it fail
+  individually with a clear per-row error;
 * null / empty values pass through unchanged;
 * one bad batch or one bad row never corrupts the successful rows around it;
   every failure is reported through the same ``ApplyReport`` the deterministic
@@ -37,7 +45,7 @@ import json
 import logging
 import math
 import re
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -124,6 +132,72 @@ def _row_id(position: int) -> str:
     return f"GEN-{position + 1:03d}"
 
 
+def _is_closed_label_task(spec: TransformationSpec) -> bool:
+    """True for classification into a known, closed label set."""
+    return spec.kind == KIND_SEMANTIC and bool(spec.allowed_labels)
+
+
+def _build_label_prompt(
+    spec: TransformationSpec,
+    examples: Sequence[Tuple[str, str]],
+    batch: Sequence[Tuple[str, str]],
+    correction: Optional[str] = None,
+) -> str:
+    """Forced-choice prompt for classification into a closed label set.
+
+    A batched "transform these N values into a results array" prompt is a lot
+    of cognitive load for a small model: measured live on the user's 8-row
+    ticket data, mistral answered only 5/8 correctly there -- it mislabelled a
+    billing ticket and invented two labels ("Screen Issues", "VPN") that the
+    repair pass only fixed intermittently.  The same model scores 8/8 on this
+    narrower prompt: one label per input, copied verbatim from the allowed
+    list, answered as a direct ``row_id -> label`` map.  The row-id contract is
+    unchanged (spec §7), so validation stays exactly as strict.
+    """
+    allowed = [str(l) for l in spec.allowed_labels]
+    shown = ", ".join(json.dumps(l, ensure_ascii=False) for l in allowed[:12])
+    lines: List[str] = [
+        "You are classifying values into a fixed set of labels.",
+        "Choose exactly ONE label for each input below.",
+        f"Allowed labels: {shown}",
+        "- The label MUST be copied verbatim from the allowed list.",
+        "- NEVER invent, rename, abbreviate or describe a label.",
+        "- If no label fits perfectly, choose the CLOSEST allowed label.",
+        "- Decide by MEANING, not by exact string matching; inputs that do not "
+        "appear in the examples must still be classified.",
+    ]
+    shown_examples = [(s, t) for s, t in examples[:_MAX_EXAMPLES_IN_PROMPT]]
+    if shown_examples:
+        lines.append("")
+        lines.append("Examples (input -> label):")
+        lines.extend(
+            f"  {json.dumps(s, ensure_ascii=False)} -> "
+            f"{json.dumps(t, ensure_ascii=False)}"
+            for s, t in shown_examples
+        )
+    lines.append("")
+    lines.append(
+        'Respond with ONLY JSON mapping each row id to its label, e.g. '
+        '{"<row_id>": "<allowed label>"}. Use the row ids exactly as given.'
+    )
+    if correction:
+        lines.append("")
+        lines.append(
+            f"Your previous response was rejected ({correction}). Answer again "
+            "with ONLY the JSON map."
+        )
+    lines.append("")
+    lines.append("Row ids (paired with the inputs below, in order):")
+    lines.append(json.dumps([rid for rid, _v in batch], ensure_ascii=False))
+    lines.append("Inputs (JSON array, in order):")
+    lines.append(json.dumps([v for _rid, v in batch], ensure_ascii=False))
+    lines.append("Inputs by row id:")
+    lines.extend(
+        f"{rid}: {json.dumps(v, ensure_ascii=False)}" for rid, v in batch
+    )
+    return "\n".join(lines)
+
+
 def _build_prompt(
     spec: TransformationSpec,
     examples: Sequence[Tuple[str, str]],
@@ -138,6 +212,8 @@ def _build_prompt(
     instead of silently shifting every later row.  The plain input array is
     still echoed so the model has the values in a simple form too.
     """
+    if _is_closed_label_task(spec):
+        return _build_label_prompt(spec, examples, batch, correction=correction)
     lines: List[str] = [
         "You are applying a data transformation to one column of a dataset.",
         _task_instructions(spec),
@@ -342,6 +418,12 @@ def _normalize_output(
     output into an accepted one, and its absence never blocks acceptance.
     """
     if raw is None:
+        if spec.allowed_labels:
+            shown = ", ".join(spec.allowed_labels[:8])
+            return None, (
+                "the model did not return one of the allowed labels "
+                f"({shown})"
+            ), False
         return None, "the model returned null for a non-empty input", False
     if isinstance(raw, bool):
         text = "true" if raw else "false"
@@ -362,6 +444,92 @@ def _normalize_output(
         text = canonical
     needs_review = confidence is not None and confidence < _REVIEW_CONFIDENCE
     return text, "", needs_review
+
+
+def _is_label_offender(raw: Any, spec: TransformationSpec) -> bool:
+    """True when ``raw`` is a usable value outside the closed label set.
+
+    Mirrors the canonicalisation in :func:`_normalize_output` so the
+    corrective retry fires exactly for the rows that would otherwise fail
+    (a wrong-case label like "urgent" is canonicalised, never retried).
+    """
+    if not spec.allowed_labels or raw is None:
+        return False
+    if isinstance(raw, bool):
+        text = "true" if raw else "false"
+    elif isinstance(raw, (str, int, float)):
+        text = str(raw)
+    else:
+        return False  # wrong type: a different failure, no label retry for it
+    return text.strip().lower() not in {
+        str(label).lower() for label in spec.allowed_labels
+    }
+
+
+def _label_correction(
+    offenders: Sequence[Tuple[str, str, str]],
+    spec: TransformationSpec,
+) -> str:
+    """Build a FOCUSED forced-choice prompt for just the rejected rows.
+
+    A whole-batch "fix these rows" correction is too diffuse for a small model
+    (mistral 7B): it re-answers every row and tends to repeat the invented
+    label.  This narrower prompt shows only the offending row ids and inputs,
+    states the closed label set once, and asks for a direct id -> label map.
+    """
+    allowed = [str(label) for label in spec.allowed_labels]
+    shown = ", ".join(json.dumps(l) for l in allowed[:12])
+    rows = "\n".join(
+        f"{rid}: {json.dumps(value, ensure_ascii=False)}"
+        for rid, _wrong, value in offenders
+    )
+    ids = ", ".join(f'"{rid}"' for rid, _wrong, _value in offenders)
+    return (
+        "Choose exactly ONE label for each input below.\n"
+        f"Allowed labels: {shown}\n"
+        "- The label MUST be copied verbatim from the allowed list.\n"
+        "- NEVER invent a new label; never explain or add words.\n"
+        "- If no label fits perfectly, choose the CLOSEST allowed label.\n"
+        'Respond with ONLY JSON mapping each row id to its label, e.g. '
+        '{"<row_id>": "<allowed label>"}.\n\n'
+        f"Row ids: [{ids}]\n"
+        "Inputs:\n"
+        f"{rows}\n"
+    )
+
+
+def _parse_label_map(
+    text: str, allowed: Sequence[str], row_ids: Sequence[str]
+) -> Dict[str, str]:
+    """Parse a focused ``{row_id: label}`` answer; keep only valid labels.
+
+    Lenient about the envelope (markdown fences, a ``labels``/``results``
+    wrapper) but strict about the values: only labels from the closed set are
+    returned, canonicalised to the configured casing.  Unknown ids are
+    ignored, so a sloppy answer can never shift a row.
+    """
+    cleaned = (text or "").strip()
+    data = _extract_json(cleaned)
+    if isinstance(data, dict):
+        for key in ("labels", "results", "outputs", "mapping"):
+            inner = data.get(key)
+            if isinstance(inner, dict):
+                data = inner
+                break
+    if not isinstance(data, dict):
+        return {}
+    by_lower = {str(l).lower(): str(l) for l in allowed}
+    wanted = set(row_ids)
+    fixed: Dict[str, str] = {}
+    for rid, value in data.items():
+        if rid not in wanted:
+            continue
+        if not isinstance(value, str):
+            continue
+        canonical = by_lower.get(value.strip().lower())
+        if canonical is not None:
+            fixed[rid] = canonical
+    return fixed
 
 
 def _max_tokens_for(batch_len: int) -> int:
@@ -410,9 +578,87 @@ def _infer_batch(
             )
             return None, None, f"the model request failed: {reason}"
         outputs, confs, error = _parse_results(text or "", row_ids)
-        if outputs is not None:
-            return outputs, confs, ""
-        correction = error
+        if outputs is None and _is_closed_label_task(spec):
+            # The closed-label prompt asks for a direct {row_id: label} map;
+            # a model that still answers with the results-array shape is
+            # accepted too (parsed above), so either shape works.  A partial
+            # map keeps the labels it did give and leaves the rest to the
+            # focused retry below -- one bad row never discards good ones.
+            mapped = _parse_label_map(text or "", spec.allowed_labels, row_ids)
+            if mapped:
+                outputs = [mapped.get(rid) for rid in row_ids]
+                confs = [None] * len(row_ids)
+                error = ""
+                missing = [rid for rid in row_ids if rid not in mapped]
+                if missing:
+                    logger.warning(
+                        "Label response missed %d row id(s): %s; retrying them.",
+                        len(missing),
+                        ", ".join(missing[:5]),
+                    )
+        if outputs is None:
+            correction = error
+            continue
+        # Closed label set: when the model INVENTED a label outside the set,
+        # one FOCUSED forced-choice re-ask covers just the offending rows.  The
+        # row-id contract (spec §7) makes that possible; the budget is
+        # re-checked AFTER the batch call spent from it.
+        if spec.allowed_labels and _attempt == 0:
+            values = dict(batch)
+            offenders = [
+                (rid, "" if raw is None else str(raw).strip(), str(values.get(rid, "")))
+                for rid, raw in zip(row_ids, outputs)
+                if raw is None or _is_label_offender(raw, spec)
+            ]
+            budget_left = budget is None or int(
+                budget.get("remaining", _llm.settings.llm_max_calls_per_request)
+            ) > 0
+            if offenders and budget_left:
+                logger.warning(
+                    "Label correction retry: %d row(s) outside the allowed "
+                    "set (%s); re-asking those rows with a forced choice.",
+                    len(offenders),
+                    "; ".join(f"{rid}={text!r}" for rid, text, _ in offenders)[:300],
+                )
+                focused = _label_correction(offenders, spec)
+                try:
+                    retried = _llm.invoke(
+                        focused,
+                        max_tokens=_max_tokens_for(len(offenders)),
+                        override=override,
+                        budget=budget,
+                    )
+                except _llm.LLMUnavailableError:
+                    raise
+                except Exception as exc:
+                    logger.warning(
+                        "Focused label retry failed: %s", str(exc).strip()[:300]
+                    )
+                else:
+                    fixed = _parse_label_map(
+                        retried or "", spec.allowed_labels, [r for r, _t, _v in offenders]
+                    )
+                    if fixed:
+                        outputs = [
+                            fixed.get(rid, out) for rid, out in zip(row_ids, outputs)
+                        ]
+                        logger.info(
+                            "Focused label retry fixed %d of %d offending row(s).",
+                            len(fixed),
+                            len(offenders),
+                        )
+            remaining = [
+                rid
+                for rid, out in zip(row_ids, outputs)
+                if out is None or _is_label_offender(out, spec)
+            ]
+            if remaining and not budget_left:
+                logger.warning(
+                    "Label correction skipped: no budget left for a retry "
+                    "(%d offending row(s)).",
+                    len(remaining),
+                )
+        return outputs, confs, ""
     return None, None, f"the model returned an unusable response twice ({error})"
 
 

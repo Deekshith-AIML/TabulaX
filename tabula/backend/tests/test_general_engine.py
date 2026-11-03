@@ -91,7 +91,7 @@ class FakeLLM:
             raise self.raise_exc
         if self.responses:
             return self.responses.pop(0)
-        if "Respond with ONLY JSON" in prompt and self.classify_response is not None:
+        if "Source -> Target pairs" in prompt and self.classify_response is not None:
             return json.dumps(self.classify_response)
         if self.batch_fn is not None and "Inputs (JSON array, in order):" in prompt:
             inputs = self.batch_inputs(prompt)

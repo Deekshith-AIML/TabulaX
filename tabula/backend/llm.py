@@ -248,6 +248,12 @@ def _get_client():
 def _invoke_ollama(prompt: str, max_tokens: int) -> str:
     """Call a local Ollama server via its REST /api/chat endpoint.
 
+    Transient failures are retried with a short exponential backoff using the
+    same budget as the OpenAI path (``settings.llm_max_retries``): connection
+    errors (server restarting) and 5xx responses (a crashing/reloading
+    ``llama-server`` returns 500 while it respawns).  A 404 (model not pulled)
+    and other 4xx client errors are NOT retried -- they cannot fix themselves.
+
     Raises :class:`RuntimeError` with an actionable message when the server is
     unreachable, returns an error status, or the model is missing (not pulled).
     """
@@ -261,48 +267,84 @@ def _invoke_ollama(prompt: str, max_tokens: int) -> str:
         "stream": False,
         "options": {"temperature": 0, "num_predict": max_tokens},
     }
-    try:
-        response = httpx.post(
-            url,
-            json=payload,
-            timeout=settings.llm_timeout_seconds,
-        )
-    except httpx.HTTPError as exc:
-        logger.error("Ollama request failed to reach %s: %s", base, type(exc).__name__)
-        raise RuntimeError(
-            f"Could not reach the Ollama server at {base}. "
-            "Start it (e.g. `docker compose --profile local-ai up`) and ensure "
-            f"the model `{settings.ollama_model}` is pulled, then retry."
-        ) from exc
+    attempts = max(1, int(settings.llm_max_retries) + 1)
+    last_error: Optional[RuntimeError] = None
+    last_cause: Optional[BaseException] = None
 
-    if response.status_code == 404:
-        # Ollama returns 404 when the model is not present locally.
-        raise RuntimeError(
-            f"Ollama model `{settings.ollama_model}` is not available. "
-            f"Pull it with `ollama pull {settings.ollama_model}` "
-            "(or into the ollama container), then retry."
-        )
-    if response.status_code >= 400:
-        detail = response.text[:200]
-        logger.error("Ollama returned HTTP %s: %s", response.status_code, detail)
-        raise RuntimeError(
-            f"The Ollama request failed with HTTP {response.status_code}. "
-            "Check the Ollama server logs, then retry."
-        )
+    for attempt in range(attempts):
+        try:
+            response = httpx.post(
+                url,
+                json=payload,
+                timeout=settings.llm_timeout_seconds,
+            )
+        except httpx.HTTPError as exc:
+            logger.error(
+                "Ollama request failed to reach %s: %s", base, type(exc).__name__
+            )
+            last_error = RuntimeError(
+                f"Could not reach the Ollama server at {base}. "
+                "Start it (e.g. `docker compose --profile local-ai up`) and ensure "
+                f"the model `{settings.ollama_model}` is pulled, then retry."
+            )
+            last_cause = exc
+        else:
+            if response.status_code == 404:
+                # Ollama returns 404 when the model is not present locally.
+                raise RuntimeError(
+                    f"Ollama model `{settings.ollama_model}` is not available. "
+                    f"Pull it with `ollama pull {settings.ollama_model}` "
+                    "(or into the ollama container), then retry."
+                )
+            if response.status_code >= 500:
+                detail = response.text[:200]
+                logger.error(
+                    "Ollama returned HTTP %s: %s", response.status_code, detail
+                )
+                last_error = RuntimeError(
+                    f"The Ollama request failed with HTTP {response.status_code}. "
+                    "Check the Ollama server logs, then retry."
+                )
+                last_cause = None
+            elif response.status_code >= 400:
+                detail = response.text[:200]
+                logger.error(
+                    "Ollama returned HTTP %s: %s", response.status_code, detail
+                )
+                raise RuntimeError(
+                    f"The Ollama request failed with HTTP {response.status_code}. "
+                    "Check the Ollama server logs, then retry."
+                )
+            else:
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise RuntimeError(
+                        "The Ollama server returned a non-JSON response."
+                    ) from exc
+                message = (data.get("message") or {}).get("content")
+                if message is None:
+                    raise RuntimeError(
+                        "The Ollama response did not contain a message payload."
+                    )
+                return str(message)
 
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            "The Ollama server returned a non-JSON response."
-        ) from exc
+        # Transient failure: back off (2s, 4s, ... capped) and retry while the
+        # budget lasts.  Ollama respawns a crashed llama-server on the next
+        # request, so a short wait is usually enough.
+        if attempt < attempts - 1:
+            delay = min(2.0 * (2 ** attempt), 8.0)
+            logger.warning(
+                "Ollama transient failure; retrying in %.1fs (attempt %d/%d).",
+                delay,
+                attempt + 2,
+                attempts,
+            )
+            time.sleep(delay)
 
-    message = (data.get("message") or {}).get("content")
-    if message is None:
-        raise RuntimeError(
-            "The Ollama response did not contain a message payload."
-        )
-    return str(message)
+    if last_error is None:  # pragma: no cover - loop always sets it on exit
+        raise RuntimeError("The Ollama request failed.")
+    raise last_error from last_cause
 
 
 # --------------------------------------------------------------------------- #

@@ -279,3 +279,129 @@ def test_invoke_surfaces_quota_error_from_openai(monkeypatch):
         llm.invoke("hi", override={"api_key": "sk-x"})
     assert "no credits remaining" in str(exc.value)
     assert "platform.openai.com" in str(exc.value)
+
+
+# --------------------------------------------------------------------------- #
+# _invoke_ollama transient-failure retry (Ollama crashed/reloading -> 5xx)
+# --------------------------------------------------------------------------- #
+class _OllamaResp:
+    def __init__(self, status_code=200, payload=None, text=""):
+        self.status_code = status_code
+        self._payload = (
+            payload if payload is not None else {"message": {"content": "ok"}}
+        )
+        self.text = text or "{}"
+
+    def json(self):
+        return self._payload
+
+
+def _no_sleep(monkeypatch):
+    """Replace time.sleep with a recorder so retry tests run instantly."""
+    sleeps = []
+    monkeypatch.setattr(llm.time, "sleep", sleeps.append)
+    return sleeps
+
+
+def _post_script(monkeypatch, script):
+    """Serve scripted responses/exceptions from httpx.post, in order."""
+    import httpx
+
+    calls = []
+
+    def _post(url, json=None, timeout=None):
+        calls.append(url)
+        item = script[min(len(calls) - 1, len(script) - 1)]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setattr(httpx, "post", _post)
+    return calls
+
+
+def _attempts():
+    return max(1, int(settings.llm_max_retries) + 1)
+
+
+def test_ollama_retries_5xx_then_succeeds(monkeypatch):
+    """A transient 500 (crashed llama-server) is retried, not fatal."""
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(
+        monkeypatch,
+        [
+            _OllamaResp(status_code=500, text="llama-server has terminated"),
+            _OllamaResp(status_code=200),
+        ],
+    )
+    out = llm._invoke_ollama("hi", max_tokens=10)
+    assert out == "ok"
+    assert len(calls) == 2
+    assert sleeps == [2.0]
+
+
+def test_ollama_5xx_exhausts_retry_budget(monkeypatch):
+    """When the 5xx persists, the bounded budget stops and the error surfaces."""
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(
+        monkeypatch, [_OllamaResp(status_code=500, text="boom")]
+    )
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        llm._invoke_ollama("hi", max_tokens=10)
+    assert len(calls) == _attempts()
+    # Backoff grows: 2s, 4s, ... (capped), never zero, never unbounded.
+    assert len(sleeps) == _attempts() - 1
+    assert sleeps[0] == 2.0
+    assert all(s > 0 for s in sleeps)
+
+
+def test_ollama_404_missing_model_is_not_retried(monkeypatch):
+    """404 = model not pulled; retrying cannot fix it, so fail immediately."""
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(monkeypatch, [_OllamaResp(status_code=404)])
+    with pytest.raises(RuntimeError, match="not available"):
+        llm._invoke_ollama("hi", max_tokens=10)
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_ollama_client_4xx_is_not_retried(monkeypatch):
+    """A 4xx request error is the caller's fault, not a transient blip."""
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(monkeypatch, [_OllamaResp(status_code=400, text="bad")])
+    with pytest.raises(RuntimeError, match="HTTP 400"):
+        llm._invoke_ollama("hi", max_tokens=10)
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_ollama_connection_error_retried_then_succeeds(monkeypatch):
+    """Server restarting (connection refused) is retried like a 5xx."""
+    import httpx
+
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(
+        monkeypatch,
+        [
+            httpx.ConnectError("connection refused"),
+            _OllamaResp(status_code=200),
+        ],
+    )
+    out = llm._invoke_ollama("hi", max_tokens=10)
+    assert out == "ok"
+    assert len(calls) == 2
+    assert len(sleeps) == 1
+
+
+def test_ollama_connection_error_exhausts_budget(monkeypatch):
+    """Unreachable server keeps the actionable 'Could not reach' message."""
+    import httpx
+
+    sleeps = _no_sleep(monkeypatch)
+    calls = _post_script(
+        monkeypatch, [httpx.ConnectError("connection refused")]
+    )
+    with pytest.raises(RuntimeError, match="Could not reach the Ollama server"):
+        llm._invoke_ollama("hi", max_tokens=10)
+    assert len(calls) == _attempts()
+    assert len(sleeps) == _attempts() - 1
