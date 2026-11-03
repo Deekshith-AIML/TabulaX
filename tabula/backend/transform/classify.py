@@ -238,7 +238,10 @@ def _affix_swap(pairs: Sequence[ExamplePair]) -> Optional[Tuple[str, str, str]]:
     outs = [t for _, t in pairs]
 
     def holds(kind: str, frm: str, to: str) -> bool:
-        if not frm or not to or frm == to:
+        # ``to`` may be empty: removing a fixed prefix/suffix ('USD 100' ->
+        # '100') is a legitimate reusable rule.  ``frm`` must be non-empty and
+        # the pair must actually change something.
+        if not frm or frm == to:
             return False
         if kind == "prefix":
             return all(o == to + i[len(frm):] for i, o in zip(ins, outs))

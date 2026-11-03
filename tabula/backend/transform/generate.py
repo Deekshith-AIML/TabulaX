@@ -112,7 +112,14 @@ def _try_deterministic_string(pairs: Sequence[ExamplePair]) -> Optional[str]:
         return (
             "def transform(x):\n"
             "    try:\n"
-            "        s = '' if x is None else str(x)\n"
+            # Examples are whitespace-normalised when they are parsed (the UI
+            # and _validate_labeled both trim), so the inferred rule's domain
+            # is the trimmed value.  Applying it to an untrimmed cell would
+            # leave stray spaces in the output (e.g. title-case alone turning
+            # '  carol king  ' into '  Carol King  ' instead of 'Carol King'),
+            # i.e. the code would not reproduce the examples it was validated
+            # against.  Normalise the input the same way before applying it.
+            "        s = '' if x is None else str(x).strip()\n"
             f"        {body}\n"
             "    except Exception:\n"
             "        return x\n"

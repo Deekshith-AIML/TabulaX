@@ -64,13 +64,42 @@ class ApplyReport:
         return counts
 
 
+def _is_missing(value: object) -> bool:
+    """True for None / NaN / NaT (mirrors the model-backed path)."""
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value)) and not isinstance(value, str)
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_blank(value: object) -> bool:
+    """Empty or whitespace-only strings are data we must not rewrite."""
+    return isinstance(value, str) and not value.strip()
+
+
 def apply_to_series(
     code: str,
     series: "pd.Series",
     timeout: Optional[float] = None,
     memory_limit_mb: Optional[int] = None,
+    *,
+    preserve_blank: bool = True,
 ) -> ApplyReport:
     """Validate ``code`` and apply ``transform`` to every element of ``series``.
+
+    With ``preserve_blank=True`` (the default, used by text / algorithmic /
+    lookup rules) blank cells and missing values (``None`` / ``NaN`` / ``NaT``)
+    pass through untouched, exactly as the model-backed path does: running the
+    transform on them would turn an empty cell into ``'NAN'`` / ``'NONE'``
+    (``str(nan)``), silently corrupting data.
+
+    Numeric transformations opt out (``preserve_blank=False``): their generated
+    code deliberately maps null-like inputs to the explicit ``"MISSING"``
+    sentinel (and unparseable ones to ``nan``), which is that family's
+    documented contract.  Deciding this per family is why it is a parameter
+    rather than an unconditional rule.
 
     Raises :class:`ApplyError` if the code is rejected by the sandbox or the
     process-level limits are exceeded.  Per-row failures are reported, not
@@ -85,17 +114,32 @@ def apply_to_series(
     if not values:
         return ApplyReport(series=series.copy(), total=0, failed=0, errors=[])
 
+    if preserve_blank:
+        # Only real values go through the transform; blanks keep their exact
+        # original form (empty string stays empty, NaN stays NaN).
+        positions = [
+            i for i, v in enumerate(values) if not (_is_missing(v) or _is_blank(v))
+        ]
+    else:
+        positions = list(range(len(values)))
+    if not positions:
+        return ApplyReport(series=series.copy(), total=len(values), failed=0,
+                           errors=[])
+
     try:
         outcome = apply_transform(
             code,
-            values,
+            [values[i] for i in positions],
             timeout=timeout or settings.sandbox_timeout_seconds,
             memory_limit_mb=memory_limit_mb or settings.sandbox_memory_limit_mb,
         )
     except SandboxError as exc:
         raise ApplyError(str(exc)) from exc
 
-    new_series = pd.Series(outcome.values, index=series.index, dtype=object)
+    new_values = list(values)
+    for position, transformed in zip(positions, outcome.values):
+        new_values[position] = transformed
+    new_series = pd.Series(new_values, index=series.index, dtype=object)
     return ApplyReport(
         series=new_series,
         total=len(values),

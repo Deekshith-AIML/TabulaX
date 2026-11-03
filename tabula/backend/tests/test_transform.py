@@ -229,7 +229,11 @@ def test_fit_non_numeric_raises_or_skips():
 
 def test_numeric_code_handles_missing_and_non_numeric():
     code = generate_numeric_code([("1", "3"), ("2", "5"), ("3", "7")])
-    out = apply_to_series(code, pd.Series([None, "abc", "4", "n/a"]))
+    # Numeric rules own the blank contract: they map null-like inputs to the
+    # explicit "MISSING" sentinel, so blanks are intentionally NOT skipped
+    # (unlike text rules, where blanks must pass through unchanged).
+    out = apply_to_series(code, pd.Series([None, "abc", "4", "n/a"]),
+                          preserve_blank=False)
     vals = out.series.tolist()
     assert vals[0] == "MISSING"
     assert vals[3] == "MISSING"

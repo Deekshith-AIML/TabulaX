@@ -39,6 +39,7 @@ from transform.classify import ClassificationResult, classify
 from transform.model_exec import ModelExecutionError, apply_model_backed
 from transform.planner import Plan, PlanError, plan_examples
 from transform.spec import (
+    KIND_NUMERIC,
     STRATEGY_DETERMINISTIC,
     STRATEGY_MODEL,
     STRATEGY_NONE,
@@ -166,7 +167,9 @@ def execute(
                 "run. Regenerate the transformation and try again."
             )
         try:
-            return apply_to_series(code, series)
+            return apply_to_series(
+                code, series, preserve_blank=spec.kind != KIND_NUMERIC
+            )
         except ApplyError as exc:
             raise EngineError(str(exc)) from exc
 

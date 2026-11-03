@@ -69,7 +69,12 @@ from transform import (
 from transform.apply import ApplyError, apply_to_series
 from transform.model_exec import ModelExecutionError, apply_model_backed
 from transform import engine as general_engine
-from transform.spec import STRATEGY_MODEL, TransformationSpec, family_label
+from transform.spec import (
+    KIND_NUMERIC,
+    STRATEGY_MODEL,
+    TransformationSpec,
+    family_label,
+)
 import llm
 
 try:  # MySQL driver may be absent in some environments
@@ -596,9 +601,11 @@ async def _get_owned_transformation(owner_id: str, transformation_id: str) -> Di
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
 
 
-async def _run_transformation(code: str, series: pd.Series) -> Any:
+async def _run_transformation(
+    code: str, series: pd.Series, *, preserve_blank: bool = True
+) -> Any:
     try:
-        return apply_to_series(code, series)
+        return apply_to_series(code, series, preserve_blank=preserve_blank)
     except ApplyError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:  # pragma: no cover
@@ -625,7 +632,13 @@ async def _execute_transformation(
     """
     spec = TransformationSpec.from_dict((trans_doc or {}).get("spec"))
     if spec.strategy != STRATEGY_MODEL:
-        return await _run_transformation((trans_doc or {}).get("code") or "", series)
+        # Numeric code owns the blank contract ("MISSING"); every other family
+        # preserves blank cells untouched instead of stringifying NaN.
+        return await _run_transformation(
+            (trans_doc or {}).get("code") or "",
+            series,
+            preserve_blank=spec.kind != KIND_NUMERIC,
+        )
 
     examples = [tuple(p) for p in ((trans_doc or {}).get("examples") or [])]
     budget = {"remaining": settings.llm_max_calls_per_request}

@@ -484,6 +484,40 @@ class TestGroupE_NumericStringRegression:
         out = apply_to_series(g.code, pd.Series(["alice johnson"]))
         assert out.series.tolist() == ["Alice Johnson"]
 
+    def test_deterministic_string_rules_normalise_input_whitespace(self):
+        """Surrounding spaces are normalised, like the examples themselves.
+
+        Examples are trimmed when parsed, so a rule can never learn "strip"
+        from them.  The code must therefore apply the inferred rule to the
+        trimmed value, otherwise it would not reproduce its own examples on
+        real data ('  carol king  ' -> '  Carol King  ' instead of
+        'Carol King').
+        """
+        pairs = parse_examples("alice smith -> Alice Smith\nbob jones -> Bob Jones")
+        for classification in ("String-based",):
+            g = generate(pairs, classification, allow_llm=False)
+            assert g.used_llm is False
+            out = apply_to_series(
+                g.code, pd.Series(["  carol king  ", "dave lee\t"])
+            )
+            assert out.series.tolist() == ["Carol King", "Dave Lee"]
+
+        # The same holds for the other deterministic string rules.
+        up = generate(
+            parse_examples("anna -> ANNA\nben -> BEN"), "String-based",
+            allow_llm=False,
+        )
+        assert apply_to_series(up.code, pd.Series(["  cy  "])).series.tolist() == [
+            "CY"
+        ]
+        swap = generate(
+            parse_examples("SKU-1 -> ITEM-1\nSKU-2 -> ITEM-2"), "String-based",
+            allow_llm=False,
+        )
+        assert apply_to_series(
+            swap.code, pd.Series(["  SKU-9  ", "ABC-9"])
+        ).series.tolist() == ["ITEM-9", "ABC-9"]
+
 
 # =========================================================================== #
 # Test group F -- ambiguity and failure handling
